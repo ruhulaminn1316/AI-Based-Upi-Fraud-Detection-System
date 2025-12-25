@@ -131,31 +131,69 @@ def chart():
 
 @app.route('/detect', methods=['POST'])
 def detect():
-    trans_datetime = pd.to_datetime(request.form.get("trans_datetime"))
-    v1 = trans_datetime.hour
-    v2 = trans_datetime.day
-    v3 = trans_datetime.month
-    v4 = trans_datetime.year
-    v5 = int(request.form.get("category"))
-    v6 = float(request.form.get("card_number"))
-    dob = pd.to_datetime(request.form.get("dob"))
-    # v7 = np.round((trans_datetime - dob) // np.timedelta64(1, 'Y'))
-    v7 = np.round((trans_datetime - dob).days / 365.25)
-    v8 = float(request.form.get("trans_amount"))
-    v9 = int(request.form.get("state"))
-    v10 = int(request.form.get("zip"))
-    x_test = np.array([v1, v2, v3, v4, v5, v6, v7, v8, v9, v10])
-    proba = float(model.predict(scaler.transform([x_test]))[0][0])
-    result = "VALID TRANSACTION" if proba <= BEST_THRESHOLD else "FRAUD TRANSACTION"
-    risk_score, risk_label = fuzzy_risk(proba)
-    return render_template(
-        'result.html',
-        OUTPUT=result,
-        PROBABILITY=round(proba, 4),
-        THRESHOLD=round(BEST_THRESHOLD, 4),
-        RISK_LABEL=risk_label,
-        RISK_SCORE=round(risk_score, 2),
-    )
+    try:
+        trans_datetime = pd.to_datetime(request.form.get("trans_datetime"))
+        dob = pd.to_datetime(request.form.get("dob"))
+        v5 = int(request.form.get("category"))
+        v6 = float(request.form.get("card_number"))
+        v8 = float(request.form.get("trans_amount"))
+        v9 = int(request.form.get("state"))
+        v10 = int(request.form.get("zip"))
+        
+        # Input validation
+        errors = []
+        if trans_datetime <= dob:
+            errors.append("Transaction date must be after date of birth")
+        if dob > pd.Timestamp.now():
+            errors.append("Date of birth cannot be in the future")
+        if v6 < 1000000000000000 or v6 > 9999999999999999:
+            errors.append("Invalid card number (must be 16 digits)")
+        if v8 <= 0:
+            errors.append("Transaction amount must be positive")
+        if v9 < 0 or v9 > 100:
+            errors.append("Invalid state code")
+        if v10 < 10000 or v10 > 999999:
+            errors.append("Invalid ZIP code")
+        
+        if errors:
+            return render_template(
+                'result.html',
+                OUTPUT="INVALID INPUT",
+                PROBABILITY="N/A",
+                THRESHOLD="N/A",
+                RISK_LABEL="ERROR",
+                RISK_SCORE="N/A",
+                ERRORS=errors
+            )
+        
+        v1 = trans_datetime.hour
+        v2 = trans_datetime.day
+        v3 = trans_datetime.month
+        v4 = trans_datetime.year
+        v7 = np.round((trans_datetime - dob).days / 365.25)
+        
+        x_test = np.array([v1, v2, v3, v4, v5, v6, v7, v8, v9, v10])
+        proba = float(model.predict(scaler.transform([x_test]))[0][0])
+        result = "VALID TRANSACTION" if proba <= BEST_THRESHOLD else "FRAUD TRANSACTION"
+        risk_score, risk_label = fuzzy_risk(proba)
+        return render_template(
+            'result.html',
+            OUTPUT=result,
+            PROBABILITY=round(proba, 4),
+            THRESHOLD=round(BEST_THRESHOLD, 4),
+            RISK_LABEL=risk_label,
+            RISK_SCORE=round(risk_score, 2),
+        )
+    except Exception as e:
+        return render_template(
+            'result.html',
+            OUTPUT="ERROR",
+            PROBABILITY="N/A",
+            THRESHOLD="N/A",
+            RISK_LABEL="ERROR",
+            RISK_SCORE="N/A",
+            ERRORS=[f"Invalid input format: {str(e)}"]
+        )
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))  # Render assigns a port dynamically
