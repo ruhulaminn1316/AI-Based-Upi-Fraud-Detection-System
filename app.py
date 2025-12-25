@@ -133,29 +133,48 @@ def chart():
 @app.route('/detect', methods=['POST'])
 def detect():
     try:
-        trans_datetime = pd.to_datetime(request.form.get("trans_datetime"))
-        dob = pd.to_datetime(request.form.get("dob"))
-        v5 = int(request.form.get("category"))
-        v6 = float(request.form.get("card_number"))
-        v8 = float(request.form.get("trans_amount"))
-        v9 = int(request.form.get("state"))
-        v10 = int(request.form.get("zip"))
-        
-        # Input validation
+        # Raw values for robust validation (preserve leading zeros, lengths)
+        card_number_raw = request.form.get("card_number", "").strip()
+        zip_raw = request.form.get("zip", "").strip()
+        trans_datetime_raw = request.form.get("trans_datetime", "").strip()
+        dob_raw = request.form.get("dob", "").strip()
+        category_raw = request.form.get("category", "").strip()
+        state_raw = request.form.get("state", "").strip()
+        amount_raw = request.form.get("trans_amount", "").strip()
+
+        # Parse types for model
+        trans_datetime = pd.to_datetime(trans_datetime_raw)
+        dob = pd.to_datetime(dob_raw)
+        v5 = int(category_raw)
+        v9 = int(state_raw)
+        v8 = float(amount_raw)
+
+        # Validate inputs (relaxed, dataset-aligned)
         errors = []
-        if trans_datetime <= dob:
-            errors.append("Transaction date must be after date of birth")
-        if dob > pd.Timestamp.now():
-            errors.append("Date of birth cannot be in the future")
-        if v6 < 1000000000000000 or v6 > 9999999999999999:
-            errors.append("Invalid card number (must be 16 digits)")
+        if pd.isna(trans_datetime) or pd.isna(dob):
+            errors.append("Invalid dates provided")
+        else:
+            if trans_datetime <= dob:
+                errors.append("Transaction date must be after date of birth")
+            if dob > pd.Timestamp.now():
+                errors.append("Date of birth cannot be in the future")
+
+        # Card/UPI number: allow 8-19 digits, digits only
+        if not card_number_raw.isdigit() or not (8 <= len(card_number_raw) <= 19):
+            errors.append("Invalid UPI/card number (must be 8-19 digits)")
+
+        # Amount must be positive
         if v8 <= 0:
             errors.append("Transaction amount must be positive")
-        if v9 < 0 or v9 > 100:
-            errors.append("Invalid state code")
-        if v10 < 10000 or v10 > 999999:
-            errors.append("Invalid ZIP code")
-        
+
+        # State must be in select range
+        if not (0 <= v9 <= 50):
+            errors.append("Invalid state selection")
+
+        # ZIP/PIN: accept 5-6 digits, preserve leading zeros via string check
+        if not zip_raw.isdigit() or not (5 <= len(zip_raw) <= 6):
+            errors.append("Invalid PIN/ZIP (must be 5-6 digits)")
+
         if errors:
             return render_template(
                 'result.html',
@@ -164,15 +183,18 @@ def detect():
                 THRESHOLD="N/A",
                 RISK_LABEL="ERROR",
                 RISK_SCORE="N/A",
-                ERRORS=errors
+                ERRORS=errors,
             )
-        
+
+        # Feature engineering for model
         v1 = trans_datetime.hour
         v2 = trans_datetime.day
         v3 = trans_datetime.month
         v4 = trans_datetime.year
+        v6 = float(card_number_raw)
+        v10 = int(zip_raw)  # model expects numeric
         v7 = np.round((trans_datetime - dob).days / 365.25)
-        
+
         x_test = np.array([v1, v2, v3, v4, v5, v6, v7, v8, v9, v10])
         proba = float(model.predict(scaler.transform([x_test]))[0][0])
         result = "VALID TRANSACTION" if proba <= BEST_THRESHOLD else "FRAUD TRANSACTION"
@@ -193,7 +215,7 @@ def detect():
             THRESHOLD="N/A",
             RISK_LABEL="ERROR",
             RISK_SCORE="N/A",
-            ERRORS=[f"Invalid input format: {str(e)}"]
+            ERRORS=[f"Invalid input format: {str(e)}"],
         )
 
 if __name__ == "__main__":
