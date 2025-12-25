@@ -30,14 +30,14 @@ model = tf.keras.models.load_model(os.path.join('filesuse', 'project_model1.h5')
 # Pre-compute validation probabilities for GA fitness
 val_probs = model.predict(val_x_scaled).flatten()
 
-
+# fuzy threshold optimization using Genetic Algorithm
 def _evaluate_threshold(threshold: float) -> float:
     """Compute F1 score for a given decision threshold."""
     thr = float(np.clip(threshold, 0.0, 1.0))
     preds = (val_probs >= thr).astype(int)
     return f1_score(val_y, preds)
 
-
+# Fitness function for PyGAD
 def _fitness_func(ga_instance, solution, _solution_idx):
     # ga_instance is unused; required by PyGAD signature
     return _evaluate_threshold(solution[0])
@@ -61,13 +61,14 @@ ga = pygad.GA(
 )
 ga.run()
 best_solution, _, _ = ga.best_solution()
+# Optimal threshold found by GA
 BEST_THRESHOLD = float(np.clip(best_solution[0], 0.0, 1.0))
 
 
 # Fuzzy logic setup to map probability to risk label
 probability = ctrl.Antecedent(np.linspace(0, 1, 101), "probability")
 risk = ctrl.Consequent(np.linspace(0, 100, 101), "risk")
-
+# Membership functions
 probability["low"] = fuzz.trimf(probability.universe, [0, 0, 0.4])
 probability["medium"] = fuzz.trimf(probability.universe, [0.2, 0.5, 0.8])
 probability["high"] = fuzz.trimf(probability.universe, [0.6, 1.0, 1.0])
@@ -75,7 +76,7 @@ probability["high"] = fuzz.trimf(probability.universe, [0.6, 1.0, 1.0])
 risk["low"] = fuzz.trimf(risk.universe, [0, 0, 40])
 risk["medium"] = fuzz.trimf(risk.universe, [25, 50, 75])
 risk["high"] = fuzz.trimf(risk.universe, [60, 100, 100])
-
+# Fuzzy rules
 risk_rules = [
     ctrl.Rule(probability["low"], risk["low"]),
     ctrl.Rule(probability["medium"], risk["medium"]),
@@ -84,7 +85,7 @@ risk_rules = [
 
 risk_control = ctrl.ControlSystem(risk_rules)
 
-
+# Function to compute fuzzy risk score and label
 def fuzzy_risk(prob_value: float):
     sim = ctrl.ControlSystemSimulation(risk_control)
     sim.input["probability"] = float(np.clip(prob_value, 0.0, 1.0))
