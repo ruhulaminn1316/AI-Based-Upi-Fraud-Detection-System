@@ -125,7 +125,7 @@
 
           <div class="col-md-12 col-sm-12 col-xs-12" style="margin-left:450px;">
 
-            <form action="http://localhost:5000/preview" name="fs" id="fs" method="post" enctype=multipart/form-data>
+            <form action="{{ url_for('preview') }}" name="fs" id="fs" method="post" enctype=multipart/form-data>
               <br />
               <input type="file" name="datasetfile" id="file1" required />
               <br />
