@@ -41,7 +41,7 @@ This project focuses on detecting fraudulent transactions within the Unified Pay
    
 Play the video below: ⬇️
 
-[![IMAGE ALT TEXT HERE](https://img.youtube.com/vi/7bQwA4Ntvqk/0.jpg)](https://www.youtube.com/watch?v=7bQwA4Ntvqk)
+[![IMAGE ALT TEXT HERE](https://www.youtube.com/watch?v=iZm209nLPYM)
 
 
 ## How It Works
