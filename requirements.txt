@@ -1,0 +1,14 @@
+Python-3.10.0
+Flask
+keras
+Markdown
+numpy
+pandas
+requests
+scikit-learn
+scipy
+tensorboard
+tensorboard-data-server
+tensorflow
+pygad
+scikit-fuzzy
